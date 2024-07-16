@@ -3,6 +3,8 @@ package com.le.leojcodesandbox;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.resource.ResourceUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.dfa.FoundWord;
+import cn.hutool.dfa.WordTree;
 import com.le.leojcodesandbox.model.ExecuteCodeRequest;
 import com.le.leojcodesandbox.model.ExecuteCodeResponse;
 import com.le.leojcodesandbox.model.ExecuteMessage;
@@ -22,6 +24,17 @@ public class JavaNativeCodeSandBox implements CodeSandBox {
 
     public static final String GLOBAL_JAVA_CLASS_NAME = "Main.java";
 
+    public static final long TIME_OUT = 10000L;
+
+    public static final List<String> blackList = Arrays.asList("Files","exec");
+
+    public static final WordTree WORD_TREE;
+
+    static {
+        WORD_TREE = new WordTree();
+        WORD_TREE.addWords(blackList);
+    }
+
     public static void main(String[] args) {
         JavaNativeCodeSandBox javaNativeCodeSandBox = new JavaNativeCodeSandBox();
         ExecuteCodeRequest executeCodeRequest = new ExecuteCodeRequest();
@@ -38,11 +51,20 @@ public class JavaNativeCodeSandBox implements CodeSandBox {
 
     @Override
     public ExecuteCodeResponse executeCode(ExecuteCodeRequest request) {
+
+
         //1. 把用户的代码保存为文件
 
         List<String> inputList = request.getInputList();
         String code = request.getCode();
         String language = request.getLanguage();
+
+        FoundWord foundWord = WORD_TREE.matchWord(code);
+        if ( foundWord != null ) {
+            System.out.println(foundWord.getFoundWord());
+            return null;
+        }
+
 
         String userDir = System.getProperty("user.dir");
         String globalCodePathName = userDir + File.separator + GLOBAL_CODE_DIR_NAME;
@@ -70,10 +92,22 @@ public class JavaNativeCodeSandBox implements CodeSandBox {
         //3. 执行代码，得到输出结果
         List<ExecuteMessage> executeMessageList = new ArrayList<>();
         for (String inputArgs : inputList) {
-            String runCmd = String.format("java -Dfile.encoding=UTF-8 -cp %s Main %s", userCodeParentPath, inputArgs);
+            String runCmd = String.format("java -Xmx256m -Dfile.encoding=UTF-8 -cp %s Main %s", userCodeParentPath, inputArgs);
             try {
-                Process compileProcess = Runtime.getRuntime().exec(runCmd);
-                ExecuteMessage executeMessage = ProcessUtils.runProcessAndGetMessage(compileProcess, "运行");
+                Process runProcess = Runtime.getRuntime().exec(runCmd);
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            Thread.sleep(TIME_OUT);
+                            System.out.println("程序运行超时");
+                            runProcess.destroy();
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }).start();
+                ExecuteMessage executeMessage = ProcessUtils.runProcessAndGetMessage(runProcess, "运行");
                 executeMessageList.add(executeMessage);
                 System.out.println(executeMessage);
             } catch (IOException e) {
