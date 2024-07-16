@@ -1,7 +1,8 @@
-package com.yupi.leoj.judge.codesandbox;
+package com.le.leojcodesandbox;
 
-import com.yupi.leoj.judge.codesandbox.model.ExecuteCodeRequest;
-import com.yupi.leoj.judge.codesandbox.model.ExecuteCodeResponse;
+
+import com.le.leojcodesandbox.model.ExecuteCodeRequest;
+import com.le.leojcodesandbox.model.ExecuteCodeResponse;
 
 public interface CodeSandBox {
     ExecuteCodeResponse executeCode(ExecuteCodeRequest request);
