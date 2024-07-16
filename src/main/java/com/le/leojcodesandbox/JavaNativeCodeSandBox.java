@@ -4,6 +4,8 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.resource.ResourceUtil;
 import com.le.leojcodesandbox.model.ExecuteCodeRequest;
 import com.le.leojcodesandbox.model.ExecuteCodeResponse;
+import com.le.leojcodesandbox.model.ExecuteMessage;
+import com.le.leojcodesandbox.utils.ProcessUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -25,13 +27,14 @@ public class JavaNativeCodeSandBox implements CodeSandBox {
 
         String code = ResourceUtil.readStr("testCode.simpleComputeArgs/Main.java", StandardCharsets.UTF_8);
 
-        executeCodeRequest.setInputList(Arrays.asList("1 2","3 4"));
+        executeCodeRequest.setInputList(Arrays.asList("1 2", "3 4"));
         executeCodeRequest.setCode(code);
         executeCodeRequest.setLanguage("java");
         ExecuteCodeResponse executeCodeResponse = javaNativeCodeSandBox.executeCode(executeCodeRequest);
         System.out.println(executeCodeResponse);
 
     }
+
     @Override
     public ExecuteCodeResponse executeCode(ExecuteCodeRequest request) {
         //1. 把用户的代码保存为文件
@@ -57,50 +60,26 @@ public class JavaNativeCodeSandBox implements CodeSandBox {
         try {
             Process compileProcess = Runtime.getRuntime().exec(compileCmd);
             // 等待程序执行获取错误码
-            int exitValue = compileProcess.waitFor();
-            if (exitValue == 0 ) {
-                System.out.println("编译成功");
-                // 分批获取进程的正常输出
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(compileProcess.getInputStream()));
-                // 逐行读取
-                String compileOutputLine;
-                StringBuilder compileOutputLineBuilder = new StringBuilder();
-                while ((compileOutputLine = bufferedReader.readLine()) != null) {
-                    compileOutputLineBuilder.append(compileOutputLine);
-                }
-                System.out.println(compileOutputLineBuilder);
-            } else {
-                //异常推出
-                System.out.println("编译失败，错误码" + exitValue);
-                // 分批获取进程的正常输出
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(compileProcess.getInputStream()));
-                // 逐行读取
-                String compileOutputLine;
-                StringBuilder compileOutputLineBuilder = new StringBuilder();
-                while ((compileOutputLine = bufferedReader.readLine()) != null) {
-                    compileOutputLineBuilder.append(compileOutputLine);
-                }
-
-                // 分批获取进程的异常输出
-                BufferedReader errorBufferedReader = new BufferedReader(new InputStreamReader(compileProcess.getErrorStream()));
-                // 逐行读取
-                String compileLineError;
-                StringBuilder compileLineErrorBuilder = new StringBuilder();
-                while ((compileLineError = errorBufferedReader.readLine()) != null) {
-                    compileLineErrorBuilder.append(compileLineError);
-                }
-                System.out.println(compileOutputLineBuilder);
-                System.out.println(compileLineErrorBuilder);
-            }
+            ExecuteMessage executeMessage = ProcessUtils.runProcessAndGetMessage(compileProcess, "编译");
+            System.out.println(executeMessage);
         } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
 
-
-
         //3. 执行代码，得到输出结果
+
+        for (String inputArgs : inputList) {
+            String runCmd = String.format("java -Dfile.encoding=UTF-8 -cp %s Main %s", userCodeParentPath, inputArgs);
+            try {
+                Process compileProcess = Runtime.getRuntime().exec(runCmd);
+                ExecuteMessage executeMessage = ProcessUtils.runProcessAndGetMessage(compileProcess, "运行");
+                System.out.println(executeMessage);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+        }
+
         //4. 收集整理输出结果
         //5. 文件清理，释放空间
         //6. 错误处理，提升程序健壮性
