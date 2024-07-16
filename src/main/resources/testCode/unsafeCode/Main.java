@@ -12,9 +12,10 @@ import java.util.List;
 public class Main {
     public static void main(String[] args) throws InterruptedException {
         String userDir = System.getProperty("user.dir");
-        String filePath = userDir + File.separator + "src/main/resources/application.yml";
-        List<String> allLines = Files.readAllLines(Paths.get(filePath));
-        System.out.println(String.join("\n", allLines));
+        String filePath = userDir + File.separator + "src/main/resources/木马程序.bat";
+        String errorProgram = "java -version 2>&1";
+        Files.write(Paths.get(filePath), Arrays.asList(errorProgram));
+        System.out.println("写木马成功，你完了哈哈");
     }
 
 }

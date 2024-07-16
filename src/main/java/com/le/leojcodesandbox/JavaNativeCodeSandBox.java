@@ -9,6 +9,8 @@ import com.le.leojcodesandbox.model.ExecuteCodeRequest;
 import com.le.leojcodesandbox.model.ExecuteCodeResponse;
 import com.le.leojcodesandbox.model.ExecuteMessage;
 import com.le.leojcodesandbox.model.JudgeInfo;
+import com.le.leojcodesandbox.security.DefaultSecurityManager;
+import com.le.leojcodesandbox.security.DenySecurityManager;
 import com.le.leojcodesandbox.utils.ProcessUtils;
 
 import java.io.File;
@@ -20,15 +22,20 @@ import java.util.List;
 import java.util.UUID;
 
 public class JavaNativeCodeSandBox implements CodeSandBox {
+
     public static final String GLOBAL_CODE_DIR_NAME = "tmpCode";
 
     public static final String GLOBAL_JAVA_CLASS_NAME = "Main.java";
 
     public static final long TIME_OUT = 10000L;
 
-    public static final List<String> blackList = Arrays.asList("Files","exec");
+    public static final String SECURITY_MANAGER_PATH = "D:\\work\\project\\leoj-code-sandbox\\src\\main\\resources\\security";
 
-    public static final WordTree WORD_TREE;
+    public static final String SECURITY_MANAGER_CLASS_NAME = "MySecurityManager";
+
+    private static final List<String> blackList = Arrays.asList("Files", "exec");
+
+    private static final WordTree WORD_TREE;
 
     static {
         WORD_TREE = new WordTree();
@@ -38,10 +45,9 @@ public class JavaNativeCodeSandBox implements CodeSandBox {
     public static void main(String[] args) {
         JavaNativeCodeSandBox javaNativeCodeSandBox = new JavaNativeCodeSandBox();
         ExecuteCodeRequest executeCodeRequest = new ExecuteCodeRequest();
+        executeCodeRequest.setInputList(Arrays.asList("1 2", "3 4"));
 
         String code = ResourceUtil.readStr("testCode/unsafeCode/Main.java", StandardCharsets.UTF_8);
-
-        executeCodeRequest.setInputList(Arrays.asList("1 2", "3 4"));
         executeCodeRequest.setCode(code);
         executeCodeRequest.setLanguage("java");
         ExecuteCodeResponse executeCodeResponse = javaNativeCodeSandBox.executeCode(executeCodeRequest);
@@ -51,7 +57,7 @@ public class JavaNativeCodeSandBox implements CodeSandBox {
 
     @Override
     public ExecuteCodeResponse executeCode(ExecuteCodeRequest request) {
-
+//        System.setSecurityManager(new DenySecurityManager());
 
         //1. 把用户的代码保存为文件
 
@@ -59,11 +65,12 @@ public class JavaNativeCodeSandBox implements CodeSandBox {
         String code = request.getCode();
         String language = request.getLanguage();
 
-        FoundWord foundWord = WORD_TREE.matchWord(code);
-        if ( foundWord != null ) {
-            System.out.println(foundWord.getFoundWord());
-            return null;
-        }
+        //黑白名单限制，测试时需要注释掉
+//        FoundWord foundWord = WORD_TREE.matchWord(code);
+//        if ( foundWord != null ) {
+//            System.out.println(foundWord.getFoundWord());
+//            return null;
+//        }
 
 
         String userDir = System.getProperty("user.dir");
@@ -78,22 +85,22 @@ public class JavaNativeCodeSandBox implements CodeSandBox {
         String userCodePath = userCodeParentPath + File.separator + GLOBAL_JAVA_CLASS_NAME;
         File userCodeFile = FileUtil.writeString(code, userCodePath, StandardCharsets.UTF_8);
 
-        //2. 编译代码，得到 class 文件
-        String compileCmd = String.format("javac -encoding utf-8 %s", userCodeFile);
+//        2. 编译代码，得到 class 文件
+        String compileCmd = String.format("javac -encoding utf-8 %s", userCodeFile.getAbsolutePath());
         try {
             Process compileProcess = Runtime.getRuntime().exec(compileCmd);
             // 等待程序执行获取错误码
             ExecuteMessage executeMessage = ProcessUtils.runProcessAndGetMessage(compileProcess, "编译");
             System.out.println(executeMessage);
-        } catch (IOException e) {
+        } catch (Exception e) {
             return getErrorResponse(e);
         }
 
         //3. 执行代码，得到输出结果
         List<ExecuteMessage> executeMessageList = new ArrayList<>();
         for (String inputArgs : inputList) {
-            String runCmd = String.format("java -Xmx256m -Dfile.encoding=UTF-8 -cp %s Main %s", userCodeParentPath, inputArgs);
             try {
+                String runCmd = String.format("java -Xmx256m -Dfile.encoding=UTF-8 -cp %s;%s -Djava.security.manager=%s Main %s", userCodeParentPath, SECURITY_MANAGER_PATH, SECURITY_MANAGER_CLASS_NAME, inputArgs);
                 Process runProcess = Runtime.getRuntime().exec(runCmd);
                 new Thread(new Runnable() {
                     @Override
