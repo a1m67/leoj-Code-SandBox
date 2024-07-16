@@ -17,7 +17,7 @@ public class ExecuteCodeResponse {
 
     private String message;
 
-    private String status;
+    private Integer status;
 
     private JudgeInfo judgeInfo;
 }
